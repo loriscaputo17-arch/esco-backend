@@ -137,6 +137,20 @@ def build_user_prompt(request: JourneyComposeRequest, inventory: dict[str, Any])
         for e in inventory["events"]
     ]) or "  (no events)"
 
+    valid_place_ids = ", ".join([f'"{p["id"]}"' for p in inventory["places"]])
+    valid_event_ids = ", ".join([f'"{e["id"]}"' for e in inventory["events"]])
+
+    id_constraint = f"""## CRITICAL: Valid entity_id values
+
+        The ONLY place IDs you can use:
+        [{valid_place_ids}]
+
+        The ONLY event IDs you can use:
+        [{valid_event_ids}]
+
+        If you write any other UUID, the system rejects the output. Pick from these lists ONLY.
+        Copy IDs exactly — character by character. No modifications."""
+
     schema_example = """{
   "title": "string (4-80 chars)",
   "headline": "string (8-120 chars, evocative)",
@@ -167,6 +181,8 @@ def build_user_prompt(request: JourneyComposeRequest, inventory: dict[str, Any])
 
 ## City inventory — Events upcoming
 {events_list}
+
+{id_constraint}
 
 ## Required JSON output schema
 {schema_example}

@@ -51,7 +51,7 @@ class AIJourneyComposition(BaseModel):
     duration_min: int = Field(..., ge=30, le=720)
     distance_m: Optional[int] = Field(None, ge=0, le=30000)
     vibe_tags: list[str] = Field(..., min_length=2, max_length=6)
-    steps: list[AIJourneyStep] = Field(..., min_length=3, max_length=6)
+    steps: list[AIJourneyStep] = Field(..., min_length=3, max_length=7)
 
     @field_validator("steps")
     @classmethod
