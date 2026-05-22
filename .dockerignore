@@ -1,0 +1,13 @@
+.venv/
+.env
+.env.local
+*.env
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.DS_Store
+.vscode/
+.idea/
+*.md
