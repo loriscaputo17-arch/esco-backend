@@ -2,11 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    Variabili d'ambiente del backend.
-    In locale → caricate da .env
-    In produzione → caricate da Railway env vars
-    """
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -14,12 +9,18 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Supabase (service-role: chiave admin)
+    # Supabase
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
 
-    # Anthropic (per Sessione 13)
+    # LLM providers
+    GEMINI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+
+    # LLM config
+    LLM_PROVIDER: str = "gemini"          # "gemini" | "claude"
+    LLM_MODEL_GEMINI: str = "gemini-2.5-flash-lite"
+    LLM_MODEL_CLAUDE: str = "claude-haiku-4-5"
 
     # Environment
     ENV: str = "development"

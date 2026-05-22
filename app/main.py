@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import health
+from app.routers import health, compose
 
 
 @asynccontextmanager
@@ -41,3 +41,4 @@ def root():
 
 # Routers
 app.include_router(health.router)
+app.include_router(compose.router)
