@@ -2,12 +2,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import health, compose
+from app.routers import health, compose, push
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup + shutdown hooks."""
     print(f"[esco-backend] starting in {settings.ENV} mode")
     yield
     print("[esco-backend] shutting down")
@@ -20,7 +19,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — per ora apertissimo. Lo restringeremo prima di andare in produzione vera.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,3 +40,4 @@ def root():
 # Routers
 app.include_router(health.router)
 app.include_router(compose.router)
+app.include_router(push.router)

@@ -18,9 +18,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
 
     # LLM config
-    LLM_PROVIDER: str = "gemini"          # "gemini" | "claude"
+    LLM_PROVIDER: str = "gemini"
     LLM_MODEL_GEMINI: str = "gemini-2.5-flash-lite"
     LLM_MODEL_CLAUDE: str = "claude-haiku-4-5"
+
+    # Push notifications
+    PUSH_WEBHOOK_SECRET: str = ""
 
     # Environment
     ENV: str = "development"
