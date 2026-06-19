@@ -70,6 +70,9 @@ def process_next(
     # 2. Dispatch + extract
     try:
         content = _dispatch_fetch(job)
+        sb.table("ingestion_jobs").update({
+            "fetched_content": content.model_dump(mode="json"),
+        }).eq("id", str(job.job_id)).execute()
         city_name = _lookup_city_name(sb, job.city_id)
         draft = extract_draft(content, city_name=city_name)
     except Exception as e:  # noqa: BLE001 — we want to catch anything from third-party APIs
