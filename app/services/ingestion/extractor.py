@@ -53,6 +53,10 @@ REGOLE FERREE — DA RISPETTARE PRIMA DI TUTTO IL RESTO
 
 7. AI_NOTES è per il revisore umano. Sii onesto: "estratto dal flyer, manca lat/lng", "caption vuota, info solo dall'immagine", "data sospetta", "potrebbe essere collaborazione con X".
 
+8. TIMEZONE OBBLIGATORIO per start_at/end_at di eventi. Italia: +02:00 estate (CEST, marzo→ottobre), +01:00 inverno (CET). Spagna/Ibiza idem. Mai senza timezone.
+
+9. PRICE_MIN = 0 se il content dice "free", "gratis", "ingresso libero", "no cover", "free entry". Mai null per evento dichiarato gratuito.
+
 ═══════════════════════════════════════════════════════════════════
 OUTPUT
 ═══════════════════════════════════════════════════════════════════
