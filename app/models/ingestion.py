@@ -23,6 +23,7 @@ SourceType = Literal[
     "url_other",
     "manual",
     "image",
+    "text",
     "voice",
 ]
 
