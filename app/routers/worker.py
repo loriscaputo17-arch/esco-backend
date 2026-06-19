@@ -25,8 +25,6 @@ from app.core.supabase_client import get_supabase
 from app.models.ingestion import ClaimedJob, ProcessNextResponse
 from app.services.ingestion.classifier import classify_url
 from app.services.ingestion.extractor import extract_draft
-from app.services.ingestion.fetchers.google_maps import fetch_google_maps
-from app.services.ingestion.fetchers.instagram import fetch_instagram
 from app.services.ingestion.fetchers.website import fetch_website
 
 logger = logging.getLogger(__name__)
@@ -124,20 +122,18 @@ def _require_secret(provided: str | None) -> None:
             detail="invalid worker secret",
         )
 
-
 def _dispatch_fetch(job: ClaimedJob):
     """Pick the right fetcher based on source_type."""
-    source_type = job.source_type
-    # safety net: re-classify if the source was registered without a specific type
-    if source_type in ("url_website", "url_other"):
-        source_type = classify_url(job.raw_input)
+    if job.source_type == "image":
+        from app.services.ingestion.fetchers.uploaded_image import fetch_uploaded_image
+        return fetch_uploaded_image(job.raw_input)
 
-    if source_type == "url_instagram":
-        return fetch_instagram(job.raw_input)
-    if source_type == "url_google_maps":
-        return fetch_google_maps(job.raw_input)
+    if job.source_type == "text":
+        from app.services.ingestion.fetchers.raw_text import fetch_raw_text
+        return fetch_raw_text(job.raw_input)
+
+    # Tutto il resto (link sito, url generici, legacy Instagram/Maps) → trafilatura
     return fetch_website(job.raw_input)
-
 
 def _lookup_city_name(sb, city_id) -> str | None:
     """One-shot lookup of city.name for the LLM prompt; None on miss."""
