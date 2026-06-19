@@ -29,5 +29,12 @@ class Settings(BaseSettings):
     ENV: str = "development"
     PORT: int = 8000
 
+    # Content OS — ingestion
+    GOOGLE_MAPS_API_KEY: str = ""
+    RAPIDAPI_KEY: str = ""
+    RAPIDAPI_INSTAGRAM_HOST: str = "instagram-scraper-api3.p.rapidapi.com"
+    RAPIDAPI_INSTAGRAM_PATH: str = "/wp-json/mediafy/v1/post_info"
+    INGESTION_WORKER_SECRET: str = ""
+
 
 settings = Settings()  # type: ignore

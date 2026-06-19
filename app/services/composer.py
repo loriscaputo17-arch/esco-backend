@@ -26,11 +26,11 @@ def fetch_city_inventory(city_id: str) -> dict[str, Any]:
     sb = get_supabase()
 
     places = sb.table("places").select(
-        "id, name, description, address, lat, lng, price_level, cover_image"
+        "id, name, description, address, lat, lng, price_level, cover_image, popularity"
     ).eq("city_id", city_id).execute().data
 
     events = sb.table("events").select(
-        "id, title, description, venue_name, start_at, price_min, price_max, lat, lng"
+        "id, title, description, venue_name, start_at, price_min, price_max, lat, lng, popularity, cover_image"
     ).eq("city_id", city_id).gte("start_at", "now()").order("start_at").execute().data
 
     return {"places": places or [], "events": events or []}
@@ -339,13 +339,33 @@ def compose_journey(request: JourneyComposeRequest) -> dict[str, Any]:
         })
     sb.table("journey_steps").insert(step_rows).execute()
 
-    # Take first step's cover for the journey cover (a bit of magic)
-    first_step = composition.steps[0]
-    if first_step.entity_type == "place":
-        first_entity = next((p for p in inventory["places"] if p["id"] == first_step.entity_id), None)
-    else:
-        first_entity = next((e for e in inventory["events"] if e["id"] == first_step.entity_id), None)
-    cover = (first_entity or {}).get("cover_image")
+    # Smart cover selection:
+    # 1) place più "iconico" (popularity più alta) tra gli step
+    # 2) primo step con cover_image valida
+    # 3) fallback: niente cover (la home gestisce empty state)
+    def find_cover_for_journey() -> str | None:
+        candidates = []
+        for step in composition.steps:
+            if step.entity_type == "place":
+                entity = next((p for p in inventory["places"] if p["id"] == step.entity_id), None)
+            else:
+                entity = next((e for e in inventory["events"] if e["id"] == step.entity_id), None)
+            if not entity:
+                continue
+            cover_img = entity.get("cover_image")
+            if not cover_img:
+                continue
+            popularity = entity.get("popularity") or 0
+            candidates.append((popularity, cover_img))
+
+        if not candidates:
+            return None
+
+        # Sort per popularity DESC, prendi la migliore
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1]
+
+    cover = find_cover_for_journey()
     if cover:
         sb.table("journeys").update({"cover_image": cover}).eq("id", journey_id).execute()
 
