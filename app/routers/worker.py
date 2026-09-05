@@ -27,6 +27,7 @@ from app.core.supabase_client import get_supabase
 from app.models.ingestion import ClaimedJob, ProcessNextResponse
 from app.services.ingestion.extractor import extract_draft
 from app.services.ingestion.fetchers.website import fetch_website
+from app.services.ingestion.resolver import enrich_payload
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +94,25 @@ def _process_one(sb) -> ProcessNextResponse:
     try:
         content = _dispatch_fetch(job)
 
-        # Persist fetcher output for debug
         sb.table("ingestion_jobs").update({
             "fetched_content": content.model_dump(mode="json"),
         }).eq("id", str(job.job_id)).execute()
 
-        city_name = _lookup_city_name(sb, job.city_id)
+        city_name, city_center = _lookup_city(sb, job.city_id)
         draft = extract_draft(content, city_name=city_name)
+
+        # --- resolver: il modello ha dato il candidato, OSM dà le coordinate ---
+        try:
+            payload, note = enrich_payload(
+                draft.payload, draft.kind, city_name, city_center
+            )
+            draft.payload = payload
+            if note:
+                draft.ai_notes = f"{draft.ai_notes or ''}\n{note}".strip()
+        except Exception as e:  # noqa: BLE001
+            # Il geocoding non deve MAI far fallire un job: il draft senza
+            # coordinate è comunque revisionabile, un job perso no.
+            logger.warning("resolver fallito su job %s: %s", job.job_id, e)
     except Exception as e:  # noqa: BLE001
         logger.exception("job %s failed during fetch/extract", job.job_id)
         sb.rpc("ingestion_fail", {
@@ -124,6 +137,15 @@ def _process_one(sb) -> ProcessNextResponse:
 
     draft_id = complete_resp.data
     logger.info("job %s -> draft %s", job.job_id, draft_id)
+
+    hint = getattr(job, "category_hint_id", None)
+    if hint and draft_id:
+        try:
+            sb.table("content_drafts").update(
+                {"category_id": str(hint)}
+            ).eq("id", draft_id).execute()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("categoria non applicata al draft %s: %s", draft_id, e)
 
     return ProcessNextResponse(
         job_id=job.job_id,
@@ -159,12 +181,23 @@ def _dispatch_fetch(job: ClaimedJob):
         return fetch_raw_text(job.raw_input)
     return fetch_website(job.raw_input)
 
-
-def _lookup_city_name(sb, city_id) -> str | None:
+def _lookup_city(sb, city_id) -> tuple[str | None, tuple[float, float] | None]:
+    """(nome, (lat, lng) del centro) — entrambi opzionali."""
     if not city_id:
-        return None
+        return None, None
     try:
-        resp = sb.table("cities").select("name").eq("id", str(city_id)).single().execute()
-        return (resp.data or {}).get("name")
+        resp = (
+            sb.table("cities")
+            .select("name, center_lat, center_lng, lat, lng")
+            .eq("id", str(city_id))
+            .single()
+            .execute()
+        )
+        row = resp.data or {}
+        name = row.get("name")
+        lat = row.get("center_lat") if row.get("center_lat") is not None else row.get("lat")
+        lng = row.get("center_lng") if row.get("center_lng") is not None else row.get("lng")
+        center = (float(lat), float(lng)) if lat is not None and lng is not None else None
+        return name, center
     except Exception:  # noqa: BLE001
-        return None
+        return None, None

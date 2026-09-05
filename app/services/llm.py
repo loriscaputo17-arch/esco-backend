@@ -30,25 +30,52 @@ class GeminiProvider(LLMProvider):
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self._model = genai.GenerativeModel(
             model_name=settings.LLM_MODEL_GEMINI,
-            generation_config={
-                "response_mime_type": "application/json",
-            },
+            generation_config={"response_mime_type": "application/json"},
         )
 
-    def generate_json(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> dict[str, Any]:
+    def generate_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.7,
+        max_output_tokens: int = 16384,      # default alto: una lista di 20
+    ) -> dict[str, Any]:                      # spettacoli non ci sta in 8k
         full_prompt = f"{system_prompt}\n\n---\n\n{user_prompt}"
         response = self._model.generate_content(
             full_prompt,
             generation_config={
                 "temperature": temperature,
                 "response_mime_type": "application/json",
+                "max_output_tokens": max_output_tokens,
             },
         )
-        text = response.text.strip()
+
+        # Perché non c'è testo: senza questo controllo l'errore è illeggibile
+        cand = (response.candidates or [None])[0]
+        if cand is not None:
+            motivo = getattr(cand, "finish_reason", None)
+            if motivo is not None and str(motivo).upper().endswith("MAX_TOKENS"):
+                raise ValueError(
+                    f"risposta troncata al tetto di {max_output_tokens} token: "
+                    "spezza l'input o alza max_output_tokens"
+                )
+            if motivo is not None and str(motivo).upper().endswith("SAFETY"):
+                raise ValueError("risposta bloccata dai filtri di sicurezza di Gemini")
+
+        try:
+            text = (response.text or "").strip()
+        except Exception as e:  # noqa: BLE001
+            raise ValueError(f"Gemini non ha restituito testo: {e}") from e
+        if not text:
+            raise ValueError("Gemini ha restituito una risposta vuota")
+
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Gemini didn't return valid JSON. Got: {text[:500]}") from e
+            raise ValueError(
+                f"JSON non valido ({len(text)} caratteri, "
+                f"finisce con: …{text[-80:]!r})"
+            ) from e
 
 
 # ─────────────────────────────────────────────
@@ -62,14 +89,16 @@ class ClaudeProvider(LLMProvider):
             raise RuntimeError("ANTHROPIC_API_KEY non impostata")
         self._client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    def generate_json(self, system_prompt: str, user_prompt: str, temperature: float = 0.7) -> dict[str, Any]:
+    def generate_json(self, system_prompt: str, user_prompt: str,
+                  temperature: float = 0.7,
+                  max_output_tokens: int = 16384) -> dict[str, Any]:
         # Aggiungiamo al system prompt un'istruzione esplicita di rispondere SOLO JSON.
         json_instruction = "\n\nIMPORTANT: Respond ONLY with a valid JSON object. No prose, no markdown, no code fences. Just the JSON."
         full_system = system_prompt + json_instruction
 
         message = self._client.messages.create(
             model=settings.LLM_MODEL_CLAUDE,
-            max_tokens=2048,
+            max_tokens=max_output_tokens,
             temperature=temperature,
             system=full_system,
             messages=[{"role": "user", "content": user_prompt}],
